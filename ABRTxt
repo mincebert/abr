@@ -1,0 +1,147 @@
+*BASIC
+NEW
+AUTO
+REM>ABRAsm
+:
+REM Lock or unlock an Advanced
+REM Battery-backed RAM (ABR)
+REM cartridge.
+:
+DIM code% 500
+OSARGS=&FFDA
+OSBYTE=&FFF4
+ACCCON=&FE34
+SCRATCH=&A8
+ABRADDR=SCRATCH+0
+ABRCTLBASE=&FCDC
+PARAMS=&F2
+ERRBADADDR=252
+ERRBADCMD=254
+:
+REM B%=0 for Electron, 1 for Master
+IF B%<0 OR B%>1 THEN B%=0
+:
+target%=&FFFF0900
+IF B%=1 THEN target%=&FFFFDD00
+execname$="ABR"+MID$("EM",B%+1,1)
+:
+FOR pass%=0 TO 1
+opt%=4+pass%*2
+O%=code%
+P%=target%
+[ OPT opt%
+.start
+\ fetch address of command line
+\ parameters into SCRATCH
+LDA #1
+LDY #0
+LDX #PARAMS
+JSR OSARGS
+\ check for Lock or Unlock
+LDY #0
+LDA (PARAMS),Y
+CMP #13
+BEQ syntaxerr
+CMP #ASC"L" \ =lock
+BEQ storeaction
+CMP #ASC"U" \ =unlock
+BEQ storeaction
+.badaction
+BRK
+EQUB ERRBADCMD
+EQUS "Bad action"
+BRK
+:
+.syntaxerr
+BRK
+EQUB ERRBADCMD
+EQUS "Syntax: U/L (<rom>)"
+BRK
+:
+.storeaction
+\ compute LS byte of ABR I/O
+\ address based on LS bit of
+\ action character (L=0, U=1)
+\ (ignoring ROM number)
+AND #1
+EOR #1
+ORA #ABRCTLBASE AND &FF
+STA ABRADDR
+\ MS byte of ABR I/O addr
+LDA #ABRCTLBASE DIV &100
+STA ABRADDR+1
+:
+\ skips spaces between action
+\ and ROM number
+.loop
+INY
+LDA (PARAMS),Y
+CMP #ASC" "
+BEQ loop
+:
+\ get ROM number
+CMP #13
+BEQ allroms
+SEC
+SBC #ASC"0"
+BCC badrom \ ID<"0"
+CMP #9+1
+BCC storerom \ ID<="9"
+SBC #ASC"A"-ASC"9"-1 \ sub so "A"=10
+CMP #10
+BCC badrom \ "9"<ID<"A"
+CMP #16
+BCC storerom \ ID<="F"
+.badrom
+BRK
+EQUB ERRBADADDR
+EQUS "Bad ROM"
+BRK
+:
+.allroms
+\ do even then odd ROM
+JSR action
+INC ABRADDR
+INC ABRADDR
+JMP action
+:
+.storerom
+\ update ABR I/O addr based on
+\ ROM number (even=+0, odd=+2)
+AND #1
+ASL A
+ORA ABRADDR
+STA ABRADDR
+:
+\ detect Master
+.action
+LDA #0
+LDX #1
+JSR OSBYTE
+CPX #3
+BCC notmaster
+CPX #6
+BCC master
+.notmaster
+\ write anything to ABR control
+\ to trigger (only address is
+\ important)
+LDY #0
+STA (ABRADDR),Y \ need ,Y on 6502
+RTS
+:
+.master
+\ need to set/restore ACCCON
+LDA ACCCON
+PHA
+ORA #&20
+STA ACCCON
+STA (ABRADDR) \ indirect zero page on 65C12
+PLA
+STA ACCCON
+RTS
+]
+NEXT
+save$="SAVE "+execname$+" "+STR$~code%+"+"+STR$~(O%-code%)+" "+STR$~target%+" "+STR$~((target% AND &FFFF0000) OR start)
+PRINT "*";save$
+OSCLI save$
