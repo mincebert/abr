@@ -13,6 +13,7 @@ OSBYTE=&FFF4
 ACCCON=&FE34
 SCRATCH=&A8
 ABRADDR=SCRATCH+0
+MASTER=SCRATCH+2
 ABRCTLBASE=&FCDC
 PARAMS=&F2
 ERRBADADDR=252
@@ -31,6 +32,22 @@ O%=code%
 P%=target%
 [ OPT opt%
 .start
+\ start assuming not Master
+LDA #0
+STA MASTER
+\ detect BBC OS (=model)
+LDA #0
+LDX #1
+JSR OSBYTE
+CPX #3
+BCC notmaster
+CPX #6
+BCS notmaster
+\ is master
+LDA #1
+STA MASTER
+\
+.notmaster
 \ fetch address of command line
 \ parameters into SCRATCH
 LDA #1
@@ -39,9 +56,18 @@ LDX #PARAMS
 JSR OSARGS
 \ check for Lock or Unlock
 LDY #0
+.getaction
 LDA (PARAMS),Y
 CMP #13
 BEQ syntaxerr
+CMP #ASC"M" \ =force Master
+BNE skipforcemaster
+LDA #1
+STA MASTER
+INY
+JMP getaction
+:
+.skipforcemaster
 CMP #ASC"L" \ =lock
 BEQ storeaction
 CMP #ASC"U" \ =unlock
@@ -55,7 +81,7 @@ BRK
 .syntaxerr
 BRK
 EQUB ERRBADCMD
-EQUS "Syntax: U/L (<rom>)"
+EQUS "Syntax: (M)U/L (<rom>)"
 BRK
 :
 .storeaction
@@ -115,14 +141,8 @@ STA ABRADDR
 :
 \ detect Master
 .action
-LDA #0
-LDX #1
-JSR OSBYTE
-CPX #3
-BCC notmaster
-CPX #6
-BCC master
-.notmaster
+LDA MASTER
+BNE master
 \ write anything to ABR control
 \ to trigger (only address is
 \ important)
