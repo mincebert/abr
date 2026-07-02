@@ -34,10 +34,10 @@ An optional `M` at the beginning forces BBC Master mode, which is useful when
 running a non-native OS on Master hardware with a ROM switcher (as the utility
 uses OSBYTE 0 to detect running on a Master).
 
-The nexti argument must be `U` or `L` to unlock or lock the RAM.
+The next argument must be `U` or `L` to unlock or lock the RAM.
 
 The second argument is optional and and specify the ROM number to unlock or
 lock, or can be omitted to affect all ROMs.
 
-Note that the protocol only allows selection between all even or all odd ROMs;
-any number can be entered but it will affect all the ROMs of that type.
+Note that the protocol only allows selection between *all* even or *all* odd
+ROMs; any number can be entered but it will affect all the ROMs of that type.
